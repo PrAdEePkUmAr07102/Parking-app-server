@@ -1,0 +1,42 @@
+import { BadRequestException, Injectable } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { UsersEntity } from './users.entity';
+import { Repository } from 'typeorm';
+import { UserSignupDto } from './dto/users.signup.dto';
+import * as bcrypt from 'bcrypt';
+
+@Injectable()
+export class UsersService {
+  constructor(
+    @InjectRepository(UsersEntity)
+    private readonly userRepo: Repository<UsersEntity>,
+  ) {}
+
+  async signupUser(userSignupDto: UserSignupDto) {
+    const { name, organizationName, phone, password } = userSignupDto;
+    if (!name || !organizationName || !phone || !password) {
+      throw new BadRequestException('All Fields Required');
+    }
+
+    const existingPhone = await this.userRepo.findOne({
+      where: { phone: phone },
+    });
+    if (existingPhone) {
+      throw new BadRequestException('Phone Already Exists ,Please Log-in');
+    }
+
+    const hashPassword = await bcrypt.hash(password, 10);
+    const createUser = new UsersEntity();
+    createUser.name = name;
+    createUser.organizationName = organizationName;
+    createUser.phone = phone;
+    createUser.password = hashPassword;
+
+    await this.userRepo.save(createUser);
+    const { password: _, ...userWithoutPassword } = createUser;
+    return {
+      message: 'User Created Successfully',
+      data: userWithoutPassword,
+    };
+  }
+}
