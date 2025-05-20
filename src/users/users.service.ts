@@ -4,12 +4,14 @@ import { UsersEntity } from './users.entity';
 import { Repository } from 'typeorm';
 import { UserSignupDto } from './dto/users.signup.dto';
 import * as bcrypt from 'bcrypt';
+import { JwtService } from '@nestjs/jwt';
 
 @Injectable()
 export class UsersService {
   constructor(
     @InjectRepository(UsersEntity)
     private readonly userRepo: Repository<UsersEntity>,
+    private readonly jwtService: JwtService,
   ) {}
 
   async signupUser(userSignupDto: UserSignupDto) {
@@ -32,11 +34,20 @@ export class UsersService {
     createUser.phone = phone;
     createUser.password = hashPassword;
 
-    await this.userRepo.save(createUser);
+    const savedUser = await this.userRepo.save(createUser);
+
+    const payload = { sub: savedUser.id, phone: savedUser.phone };
+    const token = this.jwtService.sign(payload);
+
     const { password: _, ...userWithoutPassword } = createUser;
     return {
       message: 'User Created Successfully',
       data: userWithoutPassword,
+      access_token: token,
     };
+  }
+
+  async findByPhone(phone: string) {
+    return await this.userRepo.findOne({ where: { phone: phone } });
   }
 }
